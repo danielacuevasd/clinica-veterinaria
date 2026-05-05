@@ -1,0 +1,174 @@
+version: '3.8'
+
+services:
+
+  # ── KAFKA + ZOOKEEPER ────────────────────────────────────────────
+  # Kafka es el sistema de mensajería para comunicación asíncrona
+  # Zookeeper es requerido por Kafka para coordinar sus procesos
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: kafka
+    depends_on: [zookeeper]
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  # ── BASES DE DATOS ───────────────────────────────────────────────
+  # Cada bloque es un contenedor MySQL independiente
+  # Puerto externo (el de tu PC) es distinto en cada uno
+  # Puerto interno del contenedor siempre es 3306
+  # MYSQL_DATABASE crea esa BD automáticamente al iniciar
+
+  db-auth:
+    image: mysql:8.0
+    container_name: db-auth
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: db_auth
+      MYSQL_USER: vet_user
+      MYSQL_PASSWORD: vet_pass
+    volumes:
+      - db_auth_data:/var/lib/mysql
+
+  db-usuarios:
+    image: mysql:8.0
+    container_name: db-usuarios
+    ports:
+      - "3308:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: db_usuarios
+      MYSQL_USER: vet_user
+      MYSQL_PASSWORD: vet_pass
+    volumes:
+      - db_usuarios_data:/var/lib/mysql
+
+  db-mascotas:
+    image: mysql:8.0
+    container_name: db-mascotas
+    ports:
+      - "3309:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: db_mascotas
+      MYSQL_USER: vet_user
+      MYSQL_PASSWORD: vet_pass
+    volumes:
+      - db_mascotas_data:/var/lib/mysql
+
+  db-veterinarios:
+    image: mysql:8.0
+    container_name: db-veterinarios
+    ports:
+      - "3310:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: db_veterinarios
+      MYSQL_USER: vet_user
+      MYSQL_PASSWORD: vet_pass
+    volumes:
+      - db_veterinarios_data:/var/lib/mysql
+
+  db-citas:
+    image: mysql:8.0
+    container_name: db-citas
+    ports:
+      - "3311:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: db_citas
+      MYSQL_USER: vet_user
+      MYSQL_PASSWORD: vet_pass
+    volumes:
+      - db_citas_data:/var/lib/mysql
+
+  db-consultas:
+    image: mysql:8.0
+    container_name: db-consultas
+    ports:
+      - "3312:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: db_consultas
+      MYSQL_USER: vet_user
+      MYSQL_PASSWORD: vet_pass
+    volumes:
+      - db_consultas_data:/var/lib/mysql
+
+  db-tratamientos:
+    image: mysql:8.0
+    container_name: db-tratamientos
+    ports:
+      - "3313:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: db_tratamientos
+      MYSQL_USER: vet_user
+      MYSQL_PASSWORD: vet_pass
+    volumes:
+      - db_tratamientos_data:/var/lib/mysql
+
+  db-inventario:
+    image: mysql:8.0
+    container_name: db-inventario
+    ports:
+      - "3314:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: db_inventario
+      MYSQL_USER: vet_user
+      MYSQL_PASSWORD: vet_pass
+    volumes:
+      - db_inventario_data:/var/lib/mysql
+
+  db-facturacion:
+    image: mysql:8.0
+    container_name: db-facturacion
+    ports:
+      - "3315:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: db_facturacion
+      MYSQL_USER: vet_user
+      MYSQL_PASSWORD: vet_pass
+    volumes:
+      - db_facturacion_data:/var/lib/mysql
+
+  db-notificaciones:
+    image: mysql:8.0
+    container_name: db-notificaciones
+    ports:
+      - "3316:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: db_notif
+      MYSQL_USER: vet_user
+      MYSQL_PASSWORD: vet_pass
+    volumes:
+      - db_notif_data:/var/lib/mysql
+
+# Los volúmenes persisten los datos aunque reinicies los contenedores
+volumes:
+  db_auth_data:
+  db_usuarios_data:
+  db_mascotas_data:
+  db_veterinarios_data:
+  db_citas_data:
+  db_consultas_data:
+  db_tratamientos_data:
+  db_inventario_data:
+  db_facturacion_data:
+  db_notif_data:
