@@ -1,0 +1,24 @@
+package com.veterinaria.ms_usuarios.dto;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import lombok.Data;
+
+@Data
+public class DuenoRequestDto {
+
+    @NotBlank(message = "El nombre es obligatorio")
+    private String nombre;
+
+    @NotBlank(message = "El apellido es obligatorio")
+    private String apellido;
+
+    @NotBlank(message = "El email es obligatorio")
+    @Email(message = "El email no tiene un formato válido")
+    private String email;
+
+    private String telefono;
+
+    @NotBlank(message = "El RUT es obligatorio")
+    private String rut;
+}
