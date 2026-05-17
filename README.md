@@ -76,3 +76,180 @@ Abrir http://localhost:8761 en el navegador.
 | ADMIN | Acceso total al sistema |
 | VETERINARIO | Consultas, tratamientos, citas |
 | DUENO | Sus mascotas, citas y facturas |
+
+## Diagramas Entidad-Relación (DER)
+
+> Las relaciones entre microservicios son lógicas, no físicas, siguiendo el principio de base de datos independiente por microservicio.
+
+### ms-auth
+```mermaid
+erDiagram
+    USUARIOS {
+        BIGINT id PK
+        VARCHAR username "NOT NULL UNIQUE"
+        VARCHAR password "NOT NULL"
+        ENUM rol "ADMIN | VETERINARIO | DUENO"
+        BOOLEAN activo "DEFAULT TRUE"
+        DATETIME created_at "DEFAULT NOW"
+    }
+```
+
+### ms-usuarios
+```mermaid
+erDiagram
+    DUENOS {
+        BIGINT id PK
+        VARCHAR nombre "NOT NULL"
+        VARCHAR apellido "NOT NULL"
+        VARCHAR email "NOT NULL UNIQUE"
+        VARCHAR telefono "NULLABLE"
+        VARCHAR rut "NOT NULL UNIQUE"
+        BOOLEAN activo "DEFAULT TRUE"
+        DATETIME created_at "DEFAULT NOW"
+    }
+```
+
+### ms-mascotas
+```mermaid
+erDiagram
+    MASCOTAS {
+        BIGINT id PK
+        VARCHAR nombre "NOT NULL"
+        VARCHAR especie "NOT NULL"
+        VARCHAR raza "NULLABLE"
+        DATE fecha_nacimiento "NULLABLE"
+        BIGINT id_dueno "NOT NULL (ref ms-usuarios)"
+        BOOLEAN activo "DEFAULT TRUE"
+        DATETIME created_at "DEFAULT NOW"
+    }
+    HISTORIAL_MEDICO {
+        BIGINT id PK
+        BIGINT id_mascota "NOT NULL FK"
+        VARCHAR descripcion "NOT NULL"
+        DATE fecha "NOT NULL"
+    }
+    MASCOTAS ||--o{ HISTORIAL_MEDICO : "tiene"
+```
+
+### ms-veterinarios
+```mermaid
+erDiagram
+    VETERINARIOS {
+        BIGINT id PK
+        VARCHAR nombre "NOT NULL"
+        VARCHAR apellido "NOT NULL"
+        VARCHAR especialidad "NOT NULL"
+        VARCHAR email "NOT NULL UNIQUE"
+        VARCHAR telefono "NULLABLE"
+        BOOLEAN disponible "DEFAULT TRUE"
+        BOOLEAN activo "DEFAULT TRUE"
+        DATETIME created_at "DEFAULT NOW"
+    }
+    HORARIOS {
+        BIGINT id PK
+        BIGINT id_veterinario "NOT NULL FK"
+        VARCHAR dia_semana "NOT NULL"
+        TIME hora_inicio "NOT NULL"
+        TIME hora_fin "NOT NULL"
+    }
+    VETERINARIOS ||--o{ HORARIOS : "tiene"
+```
+
+### ms-citas
+```mermaid
+erDiagram
+    CITAS {
+        BIGINT id PK
+        BIGINT id_mascota "NOT NULL (ref ms-mascotas)"
+        BIGINT id_veterinario "NOT NULL (ref ms-veterinarios)"
+        BIGINT id_dueno "NOT NULL (ref ms-usuarios)"
+        DATETIME fecha_hora "NOT NULL"
+        VARCHAR motivo "NULLABLE"
+        ENUM estado "PENDIENTE | CONFIRMADA | CANCELADA"
+        DATETIME created_at "DEFAULT NOW"
+    }
+```
+
+### ms-consultas
+```mermaid
+erDiagram
+    CONSULTAS {
+        BIGINT id PK
+        BIGINT id_cita "NOT NULL (ref ms-citas)"
+        BIGINT id_mascota "NOT NULL (ref ms-mascotas)"
+        BIGINT id_veterinario "NOT NULL (ref ms-veterinarios)"
+        BIGINT id_dueno "NOT NULL (ref ms-usuarios)"
+        VARCHAR diagnostico "NOT NULL"
+        DECIMAL peso "NULLABLE"
+        DECIMAL temperatura "NULLABLE"
+        TEXT observaciones "NULLABLE"
+        DATETIME fecha "DEFAULT NOW"
+    }
+```
+
+### ms-tratamientos
+```mermaid
+erDiagram
+    TRATAMIENTOS {
+        BIGINT id PK
+        BIGINT id_consulta "NOT NULL (ref ms-consultas)"
+        BIGINT id_mascota "NOT NULL (ref ms-mascotas)"
+        VARCHAR medicamento "NOT NULL"
+        VARCHAR dosis "NOT NULL"
+        VARCHAR frecuencia "NOT NULL"
+        INT duracion_dias "NOT NULL"
+        TEXT indicaciones "NULLABLE"
+        DATETIME created_at "DEFAULT NOW"
+    }
+```
+
+### ms-inventario
+```mermaid
+erDiagram
+    MEDICAMENTOS {
+        BIGINT id PK
+        VARCHAR nombre "NOT NULL UNIQUE"
+        INT stock "NOT NULL DEFAULT 0"
+        VARCHAR unidad "NOT NULL"
+        DECIMAL precio_unitario "NOT NULL"
+        BOOLEAN activo "DEFAULT TRUE"
+        DATETIME created_at "DEFAULT NOW"
+    }
+    MOVIMIENTOS_STOCK {
+        BIGINT id PK
+        BIGINT id_medicamento "NOT NULL FK"
+        ENUM tipo "ENTRADA | SALIDA"
+        INT cantidad "NOT NULL"
+        VARCHAR motivo "NULLABLE"
+        DATETIME fecha "DEFAULT NOW"
+    }
+    MEDICAMENTOS ||--o{ MOVIMIENTOS_STOCK : "registra"
+```
+
+### ms-facturacion
+```mermaid
+erDiagram
+    FACTURAS {
+        BIGINT id PK
+        BIGINT id_consulta "NOT NULL (ref ms-consultas)"
+        BIGINT id_mascota "NOT NULL (ref ms-mascotas)"
+        BIGINT id_dueno "NOT NULL (ref ms-usuarios)"
+        DECIMAL total "NOT NULL DEFAULT 0"
+        ENUM estado "PENDIENTE | PAGADA | ANULADA"
+        TEXT observaciones "NULLABLE"
+        DATETIME created_at "DEFAULT NOW"
+    }
+```
+
+### ms-notificaciones
+```mermaid
+erDiagram
+    NOTIFICACIONES {
+        BIGINT id PK
+        VARCHAR tipo "CONSULTA_REGISTRADA | CITA_CONFIRMADA"
+        BIGINT id_destinatario "NOT NULL (ref ms-usuarios)"
+        VARCHAR mensaje "NOT NULL"
+        BOOLEAN enviado "DEFAULT FALSE"
+        DATETIME fecha_envio "DEFAULT NOW"
+    }
+```
