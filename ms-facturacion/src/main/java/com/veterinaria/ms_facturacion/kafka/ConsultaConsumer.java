@@ -33,7 +33,7 @@ public class ConsultaConsumer {
             Factura factura = Factura.builder()
                     .idConsulta(evento.getIdConsulta())
                     .idMascota(evento.getIdMascota())
-                    .idDueno(0L)
+                    .idDueno(evento.getIdDueno())
                     .total(BigDecimal.valueOf(25000))
                     .estado(EstadoFactura.PENDIENTE)
                     .observaciones("Factura generada automaticamente por consulta: "

@@ -31,6 +31,9 @@ public class Consulta {
     private Long idVeterinario;
 
     @Column(nullable = false)
+    private Long idDueno;
+
+    @Column(nullable = false)
     private String diagnostico;
 
     private BigDecimal peso;

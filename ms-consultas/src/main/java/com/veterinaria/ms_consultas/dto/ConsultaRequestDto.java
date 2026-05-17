@@ -18,6 +18,9 @@ public class ConsultaRequestDto {
     @NotNull(message = "El id del veterinario es obligatorio")
     private Long idVeterinario;
 
+    @NotNull(message = "El id del dueño es obligatorio")
+    private Long idDueno;
+
     @NotBlank(message = "El diagnostico es obligatorio")
     private String diagnostico;
 

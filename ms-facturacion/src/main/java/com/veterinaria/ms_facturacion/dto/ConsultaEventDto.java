@@ -17,6 +17,7 @@ public class ConsultaEventDto {
     private Long idCita;
     private Long idMascota;
     private Long idVeterinario;
+    private Long idDueno;        // ← este es el que faltaba
     private String diagnostico;
     private LocalDateTime fecha;
 }

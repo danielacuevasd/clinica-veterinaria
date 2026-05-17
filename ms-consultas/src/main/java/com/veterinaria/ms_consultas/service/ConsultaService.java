@@ -61,6 +61,7 @@ public class ConsultaService {
                 .idCita(dto.getIdCita())
                 .idMascota(dto.getIdMascota())
                 .idVeterinario(dto.getIdVeterinario())
+                .idDueno(dto.getIdDueno())
                 .diagnostico(dto.getDiagnostico())
                 .peso(dto.getPeso())
                 .temperatura(dto.getTemperatura())
@@ -77,6 +78,7 @@ public class ConsultaService {
                 .idCita(guardada.getIdCita())
                 .idMascota(guardada.getIdMascota())
                 .idVeterinario(guardada.getIdVeterinario())
+                .idDueno(guardada.getIdDueno())
                 .diagnostico(guardada.getDiagnostico())
                 .fecha(guardada.getFecha())
                 .build();
