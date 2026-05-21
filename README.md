@@ -17,19 +17,19 @@ Proyecto Desarrollo FullStack I. Sistema de gestión veterinaria con arquitectur
 ## Microservicios
 
 | Servicio | Puerto | Descripción |
-|---|---|---|
-| eureka-server | 8761 | Service Discovery |
-| api-gateway | 8080 | Enrutamiento centralizado |
-| ms-auth | 8081 | Autenticación JWT |
-| ms-usuarios | 8082 | Gestión de dueños |
-| ms-mascotas | 8083 | Gestión de mascotas e historial |
-| ms-veterinarios | 8084 | Gestión de veterinarios y horarios |
-| ms-citas | 8085 | Agendamiento de citas |
-| ms-consultas | 8086 | Registro de consultas |
-| ms-tratamientos | 8087 | Gestión de tratamientos |
-| ms-inventario | 8088 | Control de stock de medicamentos |
-| ms-facturacion | 8089 | Emisión de facturas |
-| ms-notificaciones | 8090 | Notificaciones a dueños |
+|---|--------|---|
+| eureka-server | 9761   | Service Discovery |
+| api-gateway | 9080   | Enrutamiento centralizado |
+| ms-auth | 9081   | Autenticación JWT |
+| ms-usuarios | 9082   | Gestión de dueños |
+| ms-mascotas | 9083   | Gestión de mascotas e historial |
+| ms-veterinarios | 9084   | Gestión de veterinarios y horarios |
+| ms-citas | 9085   | Agendamiento de citas |
+| ms-consultas | 9086   | Registro de consultas |
+| ms-tratamientos | 9087   | Gestión de tratamientos |
+| ms-inventario | 9088   | Control de stock de medicamentos |
+| ms-facturacion | 9089   | Emisión de facturas |
+| ms-notificaciones | 9090   | Notificaciones a dueños |
 
 ## Requisitos previos
 
@@ -57,7 +57,7 @@ docker-compose ps
 4. Resto de microservicios en cualquier orden
 
 **4. Verificar Eureka:**
-Abrir http://localhost:8761 en el navegador.
+Abrir http://localhost:9761 en el navegador.
 
 ## Flujos principales
 
