@@ -28,3 +28,9 @@ replay_pid*
 
 logs/
 *.json.log
+
+# IDE - IntelliJ
+.idea/
+*.iml
+*.ipr
+*.iws
