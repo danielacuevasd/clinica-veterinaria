@@ -170,4 +170,20 @@ class ConsultaServiceTest {
         assertEquals(1, resultado.size());
         verify(consultaRepository, times(1)).findByIdVeterinario(1L);
     }
+
+    // findAll() - lista completa de consultas
+    @Test
+    @DisplayName("findAll: deberia retornar todas las consultas")
+    void findAll_retornaListaDeConsultas() {
+        // Given
+        when(consultaRepository.findAll())
+                .thenReturn(List.of(consultaGuardadaEjemplo));
+
+        // When
+        List<ConsultaResponseDto> resultado = consultaService.findAll();
+
+        // Then
+        assertEquals(1, resultado.size());
+        verify(consultaRepository, times(1)).findAll();
+    }
 }
