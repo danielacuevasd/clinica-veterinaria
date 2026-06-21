@@ -17,6 +17,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -206,5 +207,65 @@ class CitaServiceTest {
         // When + Then
         assertThrows(RuntimeException.class, () -> citaService.cancelar(99L));
         verify(citaRepository, never()).save(any(Cita.class));
+    }
+
+    // findAll() - lista completa de citas
+    @Test
+    @DisplayName("findAll: deberia retornar todas las citas")
+    void findAll_retornaListaDeCitas() {
+        // Given
+        when(citaRepository.findAll()).thenReturn(List.of(citaEjemplo));
+
+        // When
+        List<CitaResponseDto> resultado = citaService.findAll();
+
+        // Then
+        assertEquals(1, resultado.size());
+        verify(citaRepository, times(1)).findAll();
+    }
+
+    // findByDueno() - citas de un dueno especifico
+    @Test
+    @DisplayName("findByDueno: deberia retornar las citas del dueno")
+    void findByDueno_retornaCitasDelDueno() {
+        // Given
+        when(citaRepository.findByIdDueno(1L)).thenReturn(List.of(citaEjemplo));
+
+        // When
+        List<CitaResponseDto> resultado = citaService.findByDueno(1L);
+
+        // Then
+        assertEquals(1, resultado.size());
+        verify(citaRepository, times(1)).findByIdDueno(1L);
+    }
+
+    // findByVeterinario() - citas de un veterinario especifico
+    @Test
+    @DisplayName("findByVeterinario: deberia retornar las citas del veterinario")
+    void findByVeterinario_retornaCitasDelVeterinario() {
+        // Given
+        when(citaRepository.findByIdVeterinario(1L)).thenReturn(List.of(citaEjemplo));
+
+        // When
+        List<CitaResponseDto> resultado = citaService.findByVeterinario(1L);
+
+        // Then
+        assertEquals(1, resultado.size());
+        verify(citaRepository, times(1)).findByIdVeterinario(1L);
+    }
+
+    // findByMascota() - citas de una mascota especifica
+    @Test
+    @DisplayName("findByMascota: deberia retornar las citas de la mascota")
+    void findByMascota_retornaCitasDeLaMascota() {
+        // Given
+        when(citaRepository.findByIdMascota(1L)).thenReturn(List.of(citaEjemplo));
+
+        // When
+        List<CitaResponseDto> resultado = citaService.findByMascota(1L);
+
+        // Then
+        assertEquals(1, resultado.size());
+        verify(citaRepository, times(1)).findByIdMascota(1L);
     }
 }
