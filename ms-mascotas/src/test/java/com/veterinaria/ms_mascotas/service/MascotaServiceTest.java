@@ -207,4 +207,112 @@ class MascotaServiceTest {
         // Si la mascota no existe, NUNCA debe guardarse el historial
         verify(historialMedicoRepository, never()).save(any(HistorialMedico.class));
     }
+
+    // findAll() - lista de mascotas activas
+    @Test
+    @DisplayName("findAll: deberia retornar todas las mascotas activas")
+    void findAll_retornaListaDeMascotasActivas() {
+        // Given
+        when(mascotaRepository.findByActivoTrue()).thenReturn(List.of(mascotaEjemplo));
+
+        // When
+        List<MascotaResponseDto> resultado = mascotaService.findAll();
+
+        // Then
+        assertEquals(1, resultado.size());
+        verify(mascotaRepository, times(1)).findByActivoTrue();
+    }
+
+    // findByEspecie() - busqueda por especie
+    @Test
+    @DisplayName("findByEspecie: deberia retornar mascotas de la especie indicada")
+    void findByEspecie_retornaMascotasDeLaEspecie() {
+        // Given
+        when(mascotaRepository.findByEspecieIgnoreCase("Gato"))
+                .thenReturn(List.of(mascotaEjemplo));
+
+        // When
+        List<MascotaResponseDto> resultado = mascotaService.findByEspecie("Gato");
+
+        // Then
+        assertEquals(1, resultado.size());
+        assertEquals("Gato", resultado.get(0).getEspecie());
+        verify(mascotaRepository, times(1)).findByEspecieIgnoreCase("Gato");
+    }
+
+    // search() - busqueda por nombre parcial
+    @Test
+    @DisplayName("search: deberia retornar mascotas que coincidan con el nombre buscado")
+    void search_retornaMascotasQueCoincidenConNombre() {
+        // Given
+        when(mascotaRepository.findByNombreContainingIgnoreCase("Lun"))
+                .thenReturn(List.of(mascotaEjemplo));
+
+        // When
+        List<MascotaResponseDto> resultado = mascotaService.search("Lun");
+
+        // Then
+        assertEquals(1, resultado.size());
+        assertEquals("Luna", resultado.get(0).getNombre());
+        verify(mascotaRepository, times(1)).findByNombreContainingIgnoreCase("Lun");
+    }
+
+    // update() - actualizacion de datos de la mascota
+    @Test
+    @DisplayName("update: deberia actualizar los datos de la mascota existente")
+    void update_cuandoExiste_actualizaDatosCorrectamente() {
+        // Given
+        MascotaRequestDto nuevoDato = new MascotaRequestDto();
+        nuevoDato.setNombre("Luna Editada");
+        nuevoDato.setEspecie("Gato");
+        nuevoDato.setRaza("Siames");
+        nuevoDato.setFechaNacimiento(LocalDate.of(2023, 1, 10));
+        nuevoDato.setIdDueno(1L);
+
+        when(mascotaRepository.findById(1L)).thenReturn(Optional.of(mascotaEjemplo));
+        when(mascotaRepository.save(any(Mascota.class))).thenReturn(mascotaEjemplo);
+
+        // When
+        MascotaResponseDto resultado = mascotaService.update(1L, nuevoDato);
+
+        // Then
+        assertEquals("Luna Editada", resultado.getNombre());
+        verify(mascotaRepository, times(1)).save(mascotaEjemplo);
+    }
+
+    @Test
+    @DisplayName("update: deberia lanzar excepcion si la mascota no existe")
+    void update_cuandoNoExiste_lanzaRuntimeException() {
+        // Given
+        when(mascotaRepository.findById(99L)).thenReturn(Optional.empty());
+
+        // When + Then
+        assertThrows(RuntimeException.class,
+                () -> mascotaService.update(99L, requestDtoEjemplo));
+        verify(mascotaRepository, never()).save(any(Mascota.class));
+    }
+
+    // getHistorial() - historial medico de una mascota
+    @Test
+    @DisplayName("getHistorial: deberia retornar el historial medico de la mascota")
+    void getHistorial_retornaHistorialDeLaMascota() {
+        // Given
+        HistorialMedico historialEjemplo = HistorialMedico.builder()
+                .id(1L)
+                .idMascota(1L)
+                .descripcion("Vacuna antirrabica aplicada")
+                .fecha(LocalDate.now())
+                .build();
+
+        when(historialMedicoRepository.findByIdMascotaOrderByFechaDesc(1L))
+                .thenReturn(List.of(historialEjemplo));
+
+        // When
+        List<HistorialMedicoResponseDto> resultado = mascotaService.getHistorial(1L);
+
+        // Then
+        assertEquals(1, resultado.size());
+        assertEquals("Vacuna antirrabica aplicada", resultado.get(0).getDescripcion());
+        verify(historialMedicoRepository, times(1)).findByIdMascotaOrderByFechaDesc(1L);
+    }
 }
