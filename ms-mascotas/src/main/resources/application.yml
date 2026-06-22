@@ -1,15 +1,6 @@
-server:
-  port: 9083
-
 spring:
   application:
     name: ms-mascotas
-
-  datasource:
-    url: jdbc:mysql://localhost:3309/db_mascotas?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-    username: vet_user
-    password: vet_pass
-    driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:
     hibernate:
@@ -21,9 +12,5 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
 
-eureka:
-  client:
-    service-url:
-      defaultZone: http://localhost:9761/eureka/
-  instance:
-    prefer-ip-address: true
+  profiles:
+    active: dev
