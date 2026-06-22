@@ -1,15 +1,6 @@
-server:
-  port: 9087
-
 spring:
   application:
     name: ms-tratamientos
-
-  datasource:
-    url: jdbc:mysql://localhost:3313/db_tratamientos?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-    username: vet_user
-    password: vet_pass
-    driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:
     hibernate:
@@ -22,7 +13,6 @@ spring:
     baseline-on-migrate: true
 
   kafka:
-    bootstrap-servers: localhost:9092
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
@@ -32,9 +22,5 @@ spring:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
 
-eureka:
-  client:
-    service-url:
-      defaultZone: http://localhost:9761/eureka/
-  instance:
-    prefer-ip-address: true
+  profiles:
+    active: dev
