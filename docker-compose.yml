@@ -1,16 +1,22 @@
-version: '3.8'
-
 services:
-
-  # ── KAFKA + ZOOKEEPER ────────────────────────────────────────────
-  # Kafka es el sistema de mensajería para comunicación asíncrona
-  # Zookeeper es requerido por Kafka para coordinar sus procesos
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.4.0
-    container_name: zookeeper
+  mysql-local:
+    image: mysql:8.0
+    container_name: mysql-docker
     environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
+      MYSQL_ROOT_PASSWORD: admin123
+    ports:
+      - "3406:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - microservices-network
 
   kafka:
     image: confluentinc/cp-kafka:7.4.0
@@ -21,154 +27,241 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - microservices-network
 
-  # ── BASES DE DATOS ───────────────────────────────────────────────
-  # Cada bloque es un contenedor MySQL independiente
-  # Puerto externo (el de tu PC) es distinto en cada uno
-  # Puerto interno del contenedor siempre es 3306
-  # MYSQL_DATABASE crea esa BD automáticamente al iniciar
-
-  db-auth:
-    image: mysql:8.0
-    container_name: db-auth
-    ports:
-      - "3307:3306"
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: zookeeper
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: db_auth
-      MYSQL_USER: vet_user
-      MYSQL_PASSWORD: vet_pass
-    volumes:
-      - db_auth_data:/var/lib/mysql
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - microservices-network
 
-  db-usuarios:
-    image: mysql:8.0
-    container_name: db-usuarios
+  discovery:
+    build: ./eureka-server
+    container_name: discovery
     ports:
-      - "3308:3306"
-    environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: db_usuarios
-      MYSQL_USER: vet_user
-      MYSQL_PASSWORD: vet_pass
-    volumes:
-      - db_usuarios_data:/var/lib/mysql
+      - "9761:9761"
+    networks:
+      - microservices-network
 
-  db-mascotas:
-    image: mysql:8.0
-    container_name: db-mascotas
+  gateway:
+    build: ./api-gateway
+    container_name: gateway
     ports:
-      - "3309:3306"
+      - "9080:9080"
+    depends_on:
+      - discovery
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: db_mascotas
-      MYSQL_USER: vet_user
-      MYSQL_PASSWORD: vet_pass
-    volumes:
-      - db_mascotas_data:/var/lib/mysql
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery:9761/eureka/
+    networks:
+      - microservices-network
 
-  db-veterinarios:
-    image: mysql:8.0
-    container_name: db-veterinarios
+  ms-auth:
+    build: ./ms-auth
+    container_name: ms-auth
     ports:
-      - "3310:3306"
+      - "9081:9081"
+    depends_on:
+      mysql-local:
+        condition: service_healthy
+      discovery:
+        condition: service_started
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: db_veterinarios
-      MYSQL_USER: vet_user
-      MYSQL_PASSWORD: vet_pass
-    volumes:
-      - db_veterinarios_data:/var/lib/mysql
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-local:3306/db_auth?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: admin123
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery:9761/eureka/
+    networks:
+      - microservices-network
 
-  db-citas:
-    image: mysql:8.0
-    container_name: db-citas
+  ms-usuarios:
+    build: ./ms-usuarios
+    container_name: ms-usuarios
     ports:
-      - "3311:3306"
+      - "9082:9082"
+    depends_on:
+      mysql-local:
+        condition: service_healthy
+      discovery:
+        condition: service_started
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: db_citas
-      MYSQL_USER: vet_user
-      MYSQL_PASSWORD: vet_pass
-    volumes:
-      - db_citas_data:/var/lib/mysql
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-local:3306/db_usuarios?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: admin123
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery:9761/eureka/
+    networks:
+      - microservices-network
 
-  db-consultas:
-    image: mysql:8.0
-    container_name: db-consultas
+  ms-mascotas:
+    build: ./ms-mascotas
+    container_name: ms-mascotas
     ports:
-      - "3312:3306"
+      - "9083:9083"
+    depends_on:
+      mysql-local:
+        condition: service_healthy
+      discovery:
+        condition: service_started
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: db_consultas
-      MYSQL_USER: vet_user
-      MYSQL_PASSWORD: vet_pass
-    volumes:
-      - db_consultas_data:/var/lib/mysql
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-local:3306/db_mascotas?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: admin123
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery:9761/eureka/
+    networks:
+      - microservices-network
 
-  db-tratamientos:
-    image: mysql:8.0
-    container_name: db-tratamientos
+  ms-veterinarios:
+    build: ./ms-veterinarios
+    container_name: ms-veterinarios
     ports:
-      - "3313:3306"
+      - "9084:9084"
+    depends_on:
+      mysql-local:
+        condition: service_healthy
+      discovery:
+        condition: service_started
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: db_tratamientos
-      MYSQL_USER: vet_user
-      MYSQL_PASSWORD: vet_pass
-    volumes:
-      - db_tratamientos_data:/var/lib/mysql
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-local:3306/db_veterinarios?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: admin123
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery:9761/eureka/
+    networks:
+      - microservices-network
 
-  db-inventario:
-    image: mysql:8.0
-    container_name: db-inventario
+  ms-citas:
+    build: ./ms-citas
+    container_name: ms-citas
     ports:
-      - "3314:3306"
+      - "9085:9085"
+    depends_on:
+      mysql-local:
+        condition: service_healthy
+      discovery:
+        condition: service_started
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: db_inventario
-      MYSQL_USER: vet_user
-      MYSQL_PASSWORD: vet_pass
-    volumes:
-      - db_inventario_data:/var/lib/mysql
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-local:3306/db_citas?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: admin123
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery:9761/eureka/
+    networks:
+      - microservices-network
 
-  db-facturacion:
-    image: mysql:8.0
-    container_name: db-facturacion
+  ms-consultas:
+    build: ./ms-consultas
+    container_name: ms-consultas
     ports:
-      - "3315:3306"
+      - "9086:9086"
+    depends_on:
+      mysql-local:
+        condition: service_healthy
+      discovery:
+        condition: service_started
+      kafka:
+        condition: service_started
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: db_facturacion
-      MYSQL_USER: vet_user
-      MYSQL_PASSWORD: vet_pass
-    volumes:
-      - db_facturacion_data:/var/lib/mysql
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-local:3306/db_consultas?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: admin123
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery:9761/eureka/
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    networks:
+      - microservices-network
 
-  db-notificaciones:
-    image: mysql:8.0
-    container_name: db-notificaciones
+  ms-tratamientos:
+    build: ./ms-tratamientos
+    container_name: ms-tratamientos
     ports:
-      - "3316:3306"
+      - "9087:9087"
+    depends_on:
+      mysql-local:
+        condition: service_healthy
+      discovery:
+        condition: service_started
+      kafka:
+        condition: service_started
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: db_notif
-      MYSQL_USER: vet_user
-      MYSQL_PASSWORD: vet_pass
-    volumes:
-      - db_notif_data:/var/lib/mysql
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-local:3306/db_tratamientos?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: admin123
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery:9761/eureka/
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    networks:
+      - microservices-network
 
-# Los volúmenes persisten los datos aunque reinicies los contenedores
+  ms-inventario:
+    build: ./ms-inventario
+    container_name: ms-inventario
+    ports:
+      - "9088:9088"
+    depends_on:
+      mysql-local:
+        condition: service_healthy
+      discovery:
+        condition: service_started
+      kafka:
+        condition: service_started
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-local:3306/db_inventario?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: admin123
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery:9761/eureka/
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    networks:
+      - microservices-network
+
+  ms-facturacion:
+    build: ./ms-facturacion
+    container_name: ms-facturacion
+    ports:
+      - "9089:9089"
+    depends_on:
+      mysql-local:
+        condition: service_healthy
+      discovery:
+        condition: service_started
+      kafka:
+        condition: service_started
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-local:3306/db_facturacion?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: admin123
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery:9761/eureka/
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    networks:
+      - microservices-network
+
+  ms-notificaciones:
+    build: ./ms-notificaciones
+    container_name: ms-notificaciones
+    ports:
+      - "9090:9090"
+    depends_on:
+      mysql-local:
+        condition: service_healthy
+      discovery:
+        condition: service_started
+      kafka:
+        condition: service_started
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-local:3306/db_notif?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: admin123
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery:9761/eureka/
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    networks:
+      - microservices-network
+
 volumes:
-  db_auth_data:
-  db_usuarios_data:
-  db_mascotas_data:
-  db_veterinarios_data:
-  db_citas_data:
-  db_consultas_data:
-  db_tratamientos_data:
-  db_inventario_data:
-  db_facturacion_data:
-  db_notif_data:
+  mysql_data:
+
+networks:
+  microservices-network:
+    driver: bridge
