@@ -40,24 +40,70 @@ Proyecto Desarrollo FullStack I. Sistema de gestión veterinaria con arquitectur
 
 ## Cómo levantar el proyecto
 
-**1. Levantar bases de datos y Kafka:**
+Todo el sistema (MySQL, Eureka, API Gateway, Kafka y los 10 microservicios) se levanta con un solo comando, usando Docker Compose.
+
+**1. Ubicarse en la raíz del proyecto:**
 ```bash
-docker-compose up -d
+cd clinica-veterinaria
 ```
 
-**2. Verificar contenedores:**
+**2. Levantar todo el sistema:**
 ```bash
-docker-compose ps
+docker-compose up --build
 ```
 
-**3. Levantar microservicios en IntelliJ en este orden:**
-1. eureka-server
-2. api-gateway
-3. ms-auth
-4. Resto de microservicios en cualquier orden
+La primera vez puede tardar varios minutos mientras se construyen las 12 imágenes (Maven descarga dependencias y compila cada microservicio). Las siguientes veces es más rápido gracias al cache de Docker.
+
+**3. Verificar que todo esté arriba (en otra terminal):**
+```bash
+docker ps -a
+```
+
+Todos los servicios deben mostrar estado `Up`, y `mysql-docker` debe mostrar `(healthy)`.
 
 **4. Verificar Eureka:**
-Abrir http://localhost:9761 en el navegador.
+Abrir [http://localhost:9761](http://localhost:9761) — deben aparecer registrados: API-GATEWAY, MS-AUTH, MS-USUARIOS, MS-MASCOTAS, MS-VETERINARIOS, MS-CITAS, MS-CONSULTAS, MS-TRATAMIENTOS, MS-INVENTARIO, MS-FACTURACION, MS-NOTIFICACIONES.
+
+**5. Documentación interactiva (Swagger) de cada microservicio:**
+
+| Microservicio | Swagger UI |
+|---|---|
+| ms-auth | http://localhost:9081/swagger-ui.html |
+| ms-usuarios | http://localhost:9082/swagger-ui.html |
+| ms-mascotas | http://localhost:9083/swagger-ui.html |
+| ms-veterinarios | http://localhost:9084/swagger-ui.html |
+| ms-citas | http://localhost:9085/swagger-ui.html |
+| ms-consultas | http://localhost:9086/swagger-ui.html |
+| ms-tratamientos | http://localhost:9087/swagger-ui.html |
+| ms-inventario | http://localhost:9088/swagger-ui.html |
+| ms-facturacion | http://localhost:9089/swagger-ui.html |
+| ms-notificaciones | http://localhost:9090/swagger-ui.html |
+
+**6. Probar a través del API Gateway:**
+Todas las peticiones deben ir a `http://localhost:9080`, por ejemplo:
+```
+GET  http://localhost:9080/usuarios
+GET  http://localhost:9080/mascotas
+POST http://localhost:9080/auth/login   (body: {"username":"admin","password":"admin123"})
+```
+
+**7. Detener el sistema:**
+```bash
+docker-compose down        # detiene los contenedores, conserva los datos
+docker-compose down -v     # detiene y borra los datos (reinicio limpio)
+```
+
+### Notas sobre el entorno
+
+- Si el puerto 3306 ya está en uso en tu máquina (por ejemplo, un MySQL instalado de forma nativa), `docker-compose.yml` ya expone el MySQL del proyecto en el puerto **3406** externamente — esto no afecta a los microservicios, que se conectan internamente por el nombre del contenedor (`mysql-local`) en el puerto 3306 de la red Docker.
+- Las 10 bases de datos se crean automáticamente la primera vez que arranca `mysql-local`, mediante el script `mysql-init/01-create-databases.sql`.
+- Si necesitas levantar un microservicio individual fuera de Docker (por ejemplo desde IntelliJ para depurar), recuerda detener su contenedor equivalente primero para evitar conflicto de puertos.
+
+### Perfiles de Spring (dev / prod)
+
+Cada microservicio tiene dos perfiles de configuración:
+- **dev** (activo por defecto): usado en Docker Compose y en ejecución local desde IntelliJ.
+- **prod**: usa variables de entorno (`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, etc.) para despliegues remotos (Railway, Render).
 
 ## Flujos principales
 
