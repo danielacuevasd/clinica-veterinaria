@@ -214,4 +214,23 @@ class DuenoServiceTest {
                 () -> duenoService.update(99L, requestDtoEjemplo));
         verify(duenoRepository, never()).save(any(Dueno.class));
     }
+
+    // search() - busqueda por nombre o apellido parcial
+    @Test
+    @DisplayName("search: deberia retornar duenos que coincidan con el nombre o apellido")
+    void search_retornaDuenosQueCoincidenConNombre() {
+        // Given
+        when(duenoRepository
+                .findByNombreContainingIgnoreCaseOrApellidoContainingIgnoreCase("Mar", "Mar"))
+                .thenReturn(List.of(duenoEjemplo));
+
+        // When
+        List<DuenoResponseDto> resultado = duenoService.search("Mar");
+
+        // Then
+        assertEquals(1, resultado.size());
+        assertEquals("Maria", resultado.get(0).getNombre());
+        verify(duenoRepository, times(1))
+                .findByNombreContainingIgnoreCaseOrApellidoContainingIgnoreCase("Mar", "Mar");
+    }
 }
