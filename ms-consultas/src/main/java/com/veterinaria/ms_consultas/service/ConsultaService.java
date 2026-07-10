@@ -3,6 +3,10 @@ package com.veterinaria.ms_consultas.service;
 import com.veterinaria.ms_consultas.dto.ConsultaEventDto;
 import com.veterinaria.ms_consultas.dto.ConsultaRequestDto;
 import com.veterinaria.ms_consultas.dto.ConsultaResponseDto;
+import com.veterinaria.ms_consultas.dto.MascotaDto;
+import com.veterinaria.ms_consultas.dto.VeterinarioDto;
+import com.veterinaria.ms_consultas.feign.MascotaClient;
+import com.veterinaria.ms_consultas.feign.VeterinarioClient;
 import com.veterinaria.ms_consultas.kafka.ConsultaProducer;
 import com.veterinaria.ms_consultas.model.Consulta;
 import com.veterinaria.ms_consultas.repository.ConsultaRepository;
@@ -21,6 +25,8 @@ public class ConsultaService {
 
     private final ConsultaRepository consultaRepository;
     private final ConsultaProducer consultaProducer;
+    private final MascotaClient mascotaClient;
+    private final VeterinarioClient veterinarioClient;
 
     public List<ConsultaResponseDto> findAll() {
         log.info("Obteniendo todas las consultas");
@@ -56,6 +62,24 @@ public class ConsultaService {
 
     public ConsultaResponseDto save(ConsultaRequestDto dto) {
         log.info("Registrando consulta para mascota id={}", dto.getIdMascota());
+
+        // Verificar que la mascota existe y está activa via Feign
+        MascotaDto mascota = mascotaClient.getMascota(dto.getIdMascota());
+        if (mascota == null || Boolean.FALSE.equals(mascota.getActivo())) {
+            throw new RuntimeException(
+                    "La mascota no existe o no está activa");
+        }
+        if (!mascota.getIdDueno().equals(dto.getIdDueno())) {
+            throw new RuntimeException(
+                    "La mascota no pertenece al dueño indicado");
+        }
+
+        // Verificar que el veterinario existe y está activo via Feign
+        VeterinarioDto veterinario = veterinarioClient.getVeterinario(dto.getIdVeterinario());
+        if (veterinario == null || Boolean.FALSE.equals(veterinario.getActivo())) {
+            throw new RuntimeException(
+                    "El veterinario no existe o no está activo");
+        }
 
         Consulta consulta = Consulta.builder()
                 .idCita(dto.getIdCita())
