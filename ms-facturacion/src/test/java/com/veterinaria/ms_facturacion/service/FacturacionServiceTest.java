@@ -1,7 +1,9 @@
 package com.veterinaria.ms_facturacion.service;
 
+import com.veterinaria.ms_facturacion.dto.DuenoDto;
 import com.veterinaria.ms_facturacion.dto.FacturaRequestDto;
 import com.veterinaria.ms_facturacion.dto.FacturaResponseDto;
+import com.veterinaria.ms_facturacion.feign.UsuarioClient;
 import com.veterinaria.ms_facturacion.model.EstadoFactura;
 import com.veterinaria.ms_facturacion.model.Factura;
 import com.veterinaria.ms_facturacion.repository.FacturaRepository;
@@ -23,17 +25,21 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("FacturacionService - Pruebas Unitarias")
+@DisplayName("FacturacionService - Pruebas Unitarias (con Feign mockeado)")
 class FacturacionServiceTest {
 
     @Mock
     private FacturaRepository facturaRepository;
+
+    @Mock
+    private UsuarioClient usuarioClient;
 
     @InjectMocks
     private FacturacionService facturacionService;
 
     private Factura facturaEjemplo;
     private FacturaRequestDto requestDtoEjemplo;
+    private DuenoDto duenoActivoEjemplo;
 
     @BeforeEach
     void setUp() {
@@ -54,6 +60,11 @@ class FacturacionServiceTest {
         requestDtoEjemplo.setIdDueno(1L);
         requestDtoEjemplo.setTotal(new BigDecimal("45000"));
         requestDtoEjemplo.setObservaciones("Consulta general");
+
+        // Dueno activo (happy path)
+        duenoActivoEjemplo = new DuenoDto();
+        duenoActivoEjemplo.setId(1L);
+        duenoActivoEjemplo.setActivo(true);
     }
 
     // findAll() - lista completa de facturas
@@ -116,17 +127,55 @@ class FacturacionServiceTest {
         verify(facturaRepository, times(1)).findByEstado(EstadoFactura.PENDIENTE);
     }
 
-    // save() - creacion de factura, siempre arranca en PENDIENTE
+    // save() - creacion de factura, valida dueno activo via Feign, siempre arranca en PENDIENTE
     @Test
-    @DisplayName("save: deberia crear la factura con estado PENDIENTE")
+    @DisplayName("save: deberia crear la factura con estado PENDIENTE cuando el dueno esta activo")
     void save_creaFacturaConEstadoPendiente() {
+        // Given
+        when(usuarioClient.getDueno(1L)).thenReturn(duenoActivoEjemplo);
         when(facturaRepository.save(any(Factura.class))).thenReturn(facturaEjemplo);
 
+        // When
         FacturaResponseDto resultado = facturacionService.save(requestDtoEjemplo);
 
+        // Then
         assertNotNull(resultado);
         assertEquals(EstadoFactura.PENDIENTE, resultado.getEstado());
+        verify(usuarioClient, times(1)).getDueno(1L);
         verify(facturaRepository, times(1)).save(any(Factura.class));
+    }
+
+    @Test
+    @DisplayName("save: deberia lanzar excepcion cuando el dueno no existe o no esta activo")
+    void save_cuandoDuenoNoActivo_lanzaRuntimeException() {
+        // Given
+        DuenoDto duenoInactivo = new DuenoDto();
+        duenoInactivo.setId(1L);
+        duenoInactivo.setActivo(false);
+        when(usuarioClient.getDueno(1L)).thenReturn(duenoInactivo);
+
+        // When + Then
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> facturacionService.save(requestDtoEjemplo));
+
+        assertEquals("El dueño no existe o no está activo, no se puede facturar",
+                ex.getMessage());
+        verify(facturaRepository, never()).save(any(Factura.class));
+    }
+
+    @Test
+    @DisplayName("save: deberia lanzar excepcion cuando el dueno no existe (Feign retorna null)")
+    void save_cuandoDuenoNoExiste_lanzaRuntimeException() {
+        // Given
+        when(usuarioClient.getDueno(1L)).thenReturn(null);
+
+        // When + Then
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> facturacionService.save(requestDtoEjemplo));
+
+        assertEquals("El dueño no existe o no está activo, no se puede facturar",
+                ex.getMessage());
+        verify(facturaRepository, never()).save(any(Factura.class));
     }
 
     // cambiarEstado() - actualizacion de estado de una factura
