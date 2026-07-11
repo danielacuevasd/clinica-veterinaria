@@ -3,6 +3,10 @@ package com.veterinaria.ms_consultas.service;
 import com.veterinaria.ms_consultas.dto.ConsultaEventDto;
 import com.veterinaria.ms_consultas.dto.ConsultaRequestDto;
 import com.veterinaria.ms_consultas.dto.ConsultaResponseDto;
+import com.veterinaria.ms_consultas.dto.MascotaDto;
+import com.veterinaria.ms_consultas.dto.VeterinarioDto;
+import com.veterinaria.ms_consultas.feign.MascotaClient;
+import com.veterinaria.ms_consultas.feign.VeterinarioClient;
 import com.veterinaria.ms_consultas.kafka.ConsultaProducer;
 import com.veterinaria.ms_consultas.model.Consulta;
 import com.veterinaria.ms_consultas.repository.ConsultaRepository;
@@ -25,7 +29,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("ConsultaService - Pruebas Unitarias (con Kafka mockeado)")
+@DisplayName("ConsultaService - Pruebas Unitarias (con Kafka y Feign mockeados)")
 class ConsultaServiceTest {
 
     @Mock
@@ -34,11 +38,19 @@ class ConsultaServiceTest {
     @Mock
     private ConsultaProducer consultaProducer;
 
+    @Mock
+    private MascotaClient mascotaClient;
+
+    @Mock
+    private VeterinarioClient veterinarioClient;
+
     @InjectMocks
     private ConsultaService consultaService;
 
     private ConsultaRequestDto requestDtoEjemplo;
     private Consulta consultaGuardadaEjemplo;
+    private MascotaDto mascotaActivaEjemplo;
+    private VeterinarioDto veterinarioActivoEjemplo;
 
     @BeforeEach
     void setUp() {
@@ -46,6 +58,7 @@ class ConsultaServiceTest {
         requestDtoEjemplo.setIdCita(1L);
         requestDtoEjemplo.setIdMascota(1L);
         requestDtoEjemplo.setIdVeterinario(1L);
+        requestDtoEjemplo.setIdDueno(1L);
         requestDtoEjemplo.setDiagnostico("Paciente en buen estado de salud");
         requestDtoEjemplo.setPeso(new BigDecimal("4.2"));
         requestDtoEjemplo.setTemperatura(new BigDecimal("38.5"));
@@ -57,19 +70,33 @@ class ConsultaServiceTest {
                 .idCita(1L)
                 .idMascota(1L)
                 .idVeterinario(1L)
+                .idDueno(1L)
                 .diagnostico("Paciente en buen estado de salud")
                 .peso(new BigDecimal("4.2"))
                 .temperatura(new BigDecimal("38.5"))
                 .observaciones("Control sin novedad")
                 .fecha(LocalDateTime.now())
                 .build();
+
+        // Mascota activa que SI pertenece al dueno 1L (happy path)
+        mascotaActivaEjemplo = new MascotaDto();
+        mascotaActivaEjemplo.setId(1L);
+        mascotaActivaEjemplo.setIdDueno(1L);
+        mascotaActivaEjemplo.setActivo(true);
+
+        // Veterinario activo (happy path)
+        veterinarioActivoEjemplo = new VeterinarioDto();
+        veterinarioActivoEjemplo.setId(1L);
+        veterinarioActivoEjemplo.setActivo(true);
     }
 
-    // save() - guarda en BD Y publica evento Kafka
+    // save() - happy path: valida mascota y veterinario via Feign, guarda en BD Y publica evento Kafka
     @Test
-    @DisplayName("save: deberia guardar la consulta y publicar el evento en Kafka")
+    @DisplayName("save: deberia guardar la consulta y publicar el evento en Kafka cuando mascota y veterinario son validos")
     void save_guardaConsultaYPublicaEventoKafka() {
         // Given
+        when(mascotaClient.getMascota(1L)).thenReturn(mascotaActivaEjemplo);
+        when(veterinarioClient.getVeterinario(1L)).thenReturn(veterinarioActivoEjemplo);
         when(consultaRepository.save(any(Consulta.class)))
                 .thenReturn(consultaGuardadaEjemplo);
 
@@ -90,6 +117,8 @@ class ConsultaServiceTest {
     @DisplayName("save: el evento Kafka publicado deberia contener los datos correctos de la consulta")
     void save_eventoKafkaContieneLosDatosCorrectos() {
         // Given
+        when(mascotaClient.getMascota(1L)).thenReturn(mascotaActivaEjemplo);
+        when(veterinarioClient.getVeterinario(1L)).thenReturn(veterinarioActivoEjemplo);
         when(consultaRepository.save(any(Consulta.class)))
                 .thenReturn(consultaGuardadaEjemplo);
 
@@ -105,6 +134,95 @@ class ConsultaServiceTest {
         assertEquals(1L, eventoCapturado.getIdConsulta());
         assertEquals(1L, eventoCapturado.getIdMascota());
         assertEquals("Paciente en buen estado de salud", eventoCapturado.getDiagnostico());
+    }
+
+    // save() - reglas de negocio que dependen de la respuesta de Feign (mascota)
+    @Test
+    @DisplayName("save: deberia lanzar excepcion cuando la mascota no existe (Feign retorna null)")
+    void save_cuandoMascotaNoExiste_lanzaRuntimeException() {
+        // Given: Feign simula que la mascota no existe en absoluto
+        when(mascotaClient.getMascota(1L)).thenReturn(null);
+
+        // When + Then
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> consultaService.save(requestDtoEjemplo));
+
+        assertEquals("La mascota no existe o no está activa", ex.getMessage());
+        // Si la mascota no existe, NUNCA debe guardarse ni consultarse el veterinario
+        verify(consultaRepository, never()).save(any());
+        verify(veterinarioClient, never()).getVeterinario(any());
+    }
+
+    @Test
+    @DisplayName("save: deberia lanzar excepcion cuando la mascota no esta activa")
+    void save_cuandoMascotaNoEstaActiva_lanzaRuntimeException() {
+        // Given: la mascota existe, pero esta inactiva
+        MascotaDto mascotaInactiva = new MascotaDto();
+        mascotaInactiva.setId(1L);
+        mascotaInactiva.setIdDueno(1L);
+        mascotaInactiva.setActivo(false);
+        when(mascotaClient.getMascota(1L)).thenReturn(mascotaInactiva);
+
+        // When + Then
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> consultaService.save(requestDtoEjemplo));
+
+        assertEquals("La mascota no existe o no está activa", ex.getMessage());
+        verify(consultaRepository, never()).save(any());
+        verify(consultaProducer, never()).publicarConsultaRegistrada(any());
+    }
+
+    @Test
+    @DisplayName("save: deberia lanzar excepcion cuando la mascota no pertenece al dueno indicado")
+    void save_cuandoMascotaNoPerteneceADueno_lanzaRuntimeException() {
+        // Given: la mascota existe y esta activa, pero pertenece a OTRO dueno (id=99L, no 1L)
+        MascotaDto mascotaDeOtroDueno = new MascotaDto();
+        mascotaDeOtroDueno.setId(1L);
+        mascotaDeOtroDueno.setIdDueno(99L);
+        mascotaDeOtroDueno.setActivo(true);
+        when(mascotaClient.getMascota(1L)).thenReturn(mascotaDeOtroDueno);
+
+        // When + Then
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> consultaService.save(requestDtoEjemplo));
+
+        assertEquals("La mascota no pertenece al dueño indicado", ex.getMessage());
+        // La consulta NUNCA debe guardarse si la mascota es de otro dueno
+        verify(consultaRepository, never()).save(any());
+    }
+
+    // save() - reglas de negocio que dependen de la respuesta de Feign (veterinario)
+    @Test
+    @DisplayName("save: deberia lanzar excepcion cuando el veterinario no existe (Feign retorna null)")
+    void save_cuandoVeterinarioNoExiste_lanzaRuntimeException() {
+        // Given: la mascota es valida, pero el veterinario no existe en absoluto
+        when(mascotaClient.getMascota(1L)).thenReturn(mascotaActivaEjemplo);
+        when(veterinarioClient.getVeterinario(1L)).thenReturn(null);
+
+        // When + Then
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> consultaService.save(requestDtoEjemplo));
+
+        assertEquals("El veterinario no existe o no está activo", ex.getMessage());
+        verify(consultaRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("save: deberia lanzar excepcion cuando el veterinario no esta activo")
+    void save_cuandoVeterinarioNoEstaActivo_lanzaRuntimeException() {
+        // Given: la mascota es valida, pero el veterinario existe e inactivo
+        when(mascotaClient.getMascota(1L)).thenReturn(mascotaActivaEjemplo);
+        VeterinarioDto veterinarioInactivo = new VeterinarioDto();
+        veterinarioInactivo.setId(1L);
+        veterinarioInactivo.setActivo(false);
+        when(veterinarioClient.getVeterinario(1L)).thenReturn(veterinarioInactivo);
+
+        // When + Then
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> consultaService.save(requestDtoEjemplo));
+
+        assertEquals("El veterinario no existe o no está activo", ex.getMessage());
+        verify(consultaRepository, never()).save(any());
     }
 
     // findById() - caso exitoso y de error
@@ -139,7 +257,6 @@ class ConsultaServiceTest {
 
 
     // findByMascota() - historial de consultas de una mascota
-
     @Test
     @DisplayName("findByMascota: deberia retornar las consultas de la mascota ordenadas por fecha")
     void findByMascota_retornaConsultasDeLaMascota() {
