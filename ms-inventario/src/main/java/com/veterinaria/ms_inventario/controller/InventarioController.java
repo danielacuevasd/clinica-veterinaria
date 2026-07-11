@@ -43,6 +43,12 @@ public class InventarioController {
         return ResponseEntity.ok(inventarioService.search(nombre));
     }
 
+    @GetMapping("/nombre/{nombre}")
+    public ResponseEntity<MedicamentoResponseDto> getByNombreExacto(
+            @PathVariable String nombre) {
+        return ResponseEntity.ok(inventarioService.findByNombreExacto(nombre));
+    }
+
     @PostMapping
     public ResponseEntity<MedicamentoResponseDto> create(
             @Valid @RequestBody MedicamentoRequestDto dto) {

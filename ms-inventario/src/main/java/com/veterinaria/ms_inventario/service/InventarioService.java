@@ -56,6 +56,14 @@ public class InventarioService {
                 .collect(Collectors.toList());
     }
 
+    public MedicamentoResponseDto findByNombreExacto(String nombre) {
+        log.info("Buscando medicamento por nombre exacto={}", nombre);
+        Medicamento medicamento = medicamentoRepository.findByNombre(nombre)
+                .orElseThrow(() -> new RuntimeException(
+                        "Medicamento no encontrado con nombre: " + nombre));
+        return toDto(medicamento);
+    }
+
     public MedicamentoResponseDto save(MedicamentoRequestDto dto) {
         log.info("Registrando medicamento: {}", dto.getNombre());
         if (medicamentoRepository.existsByNombre(dto.getNombre())) {
