@@ -1,7 +1,10 @@
 package com.veterinaria.ms_tratamientos.service;
 
+import com.veterinaria.ms_tratamientos.dto.MedicamentoDto;
+import com.veterinaria.ms_tratamientos.dto.MovimientoRequestDto;
 import com.veterinaria.ms_tratamientos.dto.TratamientoRequestDto;
 import com.veterinaria.ms_tratamientos.dto.TratamientoResponseDto;
+import com.veterinaria.ms_tratamientos.feign.InventarioClient;
 import com.veterinaria.ms_tratamientos.model.Tratamiento;
 import com.veterinaria.ms_tratamientos.repository.TratamientoRepository;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +21,7 @@ import java.util.stream.Collectors;
 public class TratamientoService {
 
     private final TratamientoRepository tratamientoRepository;
+    private final InventarioClient inventarioClient;
 
     public List<TratamientoResponseDto> findAll() {
         log.info("Obteniendo todos los tratamientos");
@@ -53,6 +57,27 @@ public class TratamientoService {
 
     public TratamientoResponseDto save(TratamientoRequestDto dto) {
         log.info("Creando tratamiento para consulta id={}", dto.getIdConsulta());
+
+        // Verificar que el medicamento existe y tiene stock suficiente via Feign
+        MedicamentoDto medicamento = inventarioClient.getMedicamentoPorNombre(dto.getMedicamento());
+        if (medicamento == null || Boolean.FALSE.equals(medicamento.getActivo())) {
+            throw new RuntimeException(
+                    "El medicamento no existe o no está activo: " + dto.getMedicamento());
+        }
+        if (medicamento.getStock() < dto.getDuracionDias()) {
+            throw new RuntimeException(
+                    "Stock insuficiente de " + dto.getMedicamento()
+                            + ". Stock actual: " + medicamento.getStock());
+        }
+
+        // Descontar el stock consumido para el tratamiento via Feign
+        MovimientoRequestDto movimiento = new MovimientoRequestDto();
+        movimiento.setIdMedicamento(medicamento.getId());
+        movimiento.setTipo("SALIDA");
+        movimiento.setCantidad(dto.getDuracionDias());
+        movimiento.setMotivo("Consumo por tratamiento de mascota id=" + dto.getIdMascota());
+        inventarioClient.registrarMovimiento(movimiento);
+
         Tratamiento tratamiento = Tratamiento.builder()
                 .idConsulta(dto.getIdConsulta())
                 .idMascota(dto.getIdMascota())
