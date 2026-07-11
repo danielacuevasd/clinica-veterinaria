@@ -175,6 +175,32 @@ class InventarioServiceTest {
         verify(medicamentoRepository, times(1)).findById(1L);
     }
 
+    // findByNombreExacto() - usado por otros microservicios via Feign para validar stock
+    @Test
+    @DisplayName("findByNombreExacto: deberia retornar el medicamento cuando el nombre existe exactamente")
+    void findByNombreExacto_cuandoExiste_retornaMedicamentoResponseDto() {
+        when(medicamentoRepository.findByNombre("Amoxicilina"))
+                .thenReturn(Optional.of(medicamentoEjemplo));
+
+        MedicamentoResponseDto resultado = inventarioService.findByNombreExacto("Amoxicilina");
+
+        assertNotNull(resultado);
+        assertEquals("Amoxicilina", resultado.getNombre());
+        verify(medicamentoRepository, times(1)).findByNombre("Amoxicilina");
+    }
+
+    @Test
+    @DisplayName("findByNombreExacto: deberia lanzar excepcion cuando el nombre no existe")
+    void findByNombreExacto_cuandoNoExiste_lanzaRuntimeException() {
+        when(medicamentoRepository.findByNombre("Inexistente"))
+                .thenReturn(Optional.empty());
+
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> inventarioService.findByNombreExacto("Inexistente"));
+
+        assertEquals("Medicamento no encontrado con nombre: Inexistente", ex.getMessage());
+    }
+
     @Test
     @DisplayName("findById: deberia lanzar excepcion cuando el id no existe")
     void findById_cuandoNoExiste_lanzaRuntimeException() {
