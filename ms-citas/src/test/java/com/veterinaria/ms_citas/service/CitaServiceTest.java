@@ -2,8 +2,10 @@ package com.veterinaria.ms_citas.service;
 
 import com.veterinaria.ms_citas.dto.CitaRequestDto;
 import com.veterinaria.ms_citas.dto.CitaResponseDto;
+import com.veterinaria.ms_citas.dto.DuenoDto;
 import com.veterinaria.ms_citas.dto.MascotaDto;
 import com.veterinaria.ms_citas.feign.MascotaClient;
+import com.veterinaria.ms_citas.feign.UsuarioClient;
 import com.veterinaria.ms_citas.feign.VeterinarioClient;
 import com.veterinaria.ms_citas.model.Cita;
 import com.veterinaria.ms_citas.model.EstadoCita;
@@ -37,12 +39,16 @@ class CitaServiceTest {
     @Mock
     private MascotaClient mascotaClient;
 
+    @Mock
+    private UsuarioClient usuarioClient;
+
     @InjectMocks
     private CitaService citaService;
 
     private CitaRequestDto requestDtoEjemplo;
     private Cita citaEjemplo;
     private MascotaDto mascotaDtoEjemplo;
+    private DuenoDto duenoActivoEjemplo;
 
     @BeforeEach
     void setUp() {
@@ -64,23 +70,30 @@ class CitaServiceTest {
                 .createdAt(LocalDateTime.now())
                 .build();
 
-        // Esta mascota SI pertenece al dueno 1L (caso feliz)
+        // Esta mascota SI pertenece al dueno 1L (happy path)
         mascotaDtoEjemplo = new MascotaDto();
         mascotaDtoEjemplo.setId(1L);
         mascotaDtoEjemplo.setNombre("Luna");
         mascotaDtoEjemplo.setIdDueno(1L);
         mascotaDtoEjemplo.setActivo(true);
+
+        // Dueno activo (happy path)
+        duenoActivoEjemplo = new DuenoDto();
+        duenoActivoEjemplo.setId(1L);
+        duenoActivoEjemplo.setActivo(true);
     }
 
 
-    // save() - happy path: veterinario disponible + mascota valida
+    // save() - happy path: veterinario disponible + mascota valida + dueno activo
     @Test
-    @DisplayName("save: deberia crear la cita cuando vet esta disponible y mascota es del dueno")
+    @DisplayName("save: deberia crear la cita cuando vet esta disponible, mascota es del dueno y dueno esta activo")
     void save_cuandoTodoValido_creaCitaCorrectamente() {
         // Given: Feign simula que el veterinario SI esta disponible
         when(veterinarioClient.isDisponible(1L)).thenReturn(true);
         // Given: Feign simula que la mascota existe y pertenece al dueno correcto
         when(mascotaClient.getMascota(1L)).thenReturn(mascotaDtoEjemplo);
+        // Given: Feign simula que el dueno existe y esta activo
+        when(usuarioClient.getDueno(1L)).thenReturn(duenoActivoEjemplo);
         when(citaRepository.save(any(Cita.class))).thenReturn(citaEjemplo);
 
         // When
@@ -89,9 +102,10 @@ class CitaServiceTest {
         // Then
         assertNotNull(resultado);
         assertEquals(EstadoCita.PENDIENTE, resultado.getEstado());
-        // Verifica que SI se llamo a ambos servicios externos via Feign
+        // Verifica que SI se llamo a los tres servicios externos via Feign
         verify(veterinarioClient, times(1)).isDisponible(1L);
         verify(mascotaClient, times(1)).getMascota(1L);
+        verify(usuarioClient, times(1)).getDueno(1L);
         verify(citaRepository, times(1)).save(any(Cita.class));
     }
 
@@ -109,6 +123,7 @@ class CitaServiceTest {
         assertEquals("El veterinario no está disponible para citas", ex.getMessage());
         // Si el veterinario no esta disponible, NUNCA debe consultarse la mascota ni guardar
         verify(mascotaClient, never()).getMascota(any());
+        verify(usuarioClient, never()).getDueno(any());
         verify(citaRepository, never()).save(any(Cita.class));
     }
 
@@ -133,6 +148,28 @@ class CitaServiceTest {
 
         assertEquals("La mascota no pertenece al dueño indicado", ex.getMessage());
         // La cita NUNCA debe guardarse si la mascota es de otro dueno
+        verify(usuarioClient, never()).getDueno(any());
+        verify(citaRepository, never()).save(any(Cita.class));
+    }
+
+    @Test
+    @DisplayName("save: deberia lanzar excepcion cuando el dueno no existe o no esta activo")
+    void save_cuandoDuenoNoActivo_lanzaRuntimeException() {
+        // Given: veterinario disponible y mascota valida
+        when(veterinarioClient.isDisponible(1L)).thenReturn(true);
+        when(mascotaClient.getMascota(1L)).thenReturn(mascotaDtoEjemplo);
+
+        // Given: el dueno existe pero esta inactivo
+        DuenoDto duenoInactivo = new DuenoDto();
+        duenoInactivo.setId(1L);
+        duenoInactivo.setActivo(false);
+        when(usuarioClient.getDueno(1L)).thenReturn(duenoInactivo);
+
+        // When + Then
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> citaService.save(requestDtoEjemplo));
+
+        assertEquals("El dueño no existe o no está activo", ex.getMessage());
         verify(citaRepository, never()).save(any(Cita.class));
     }
 
