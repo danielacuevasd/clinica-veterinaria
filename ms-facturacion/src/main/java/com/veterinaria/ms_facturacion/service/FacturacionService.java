@@ -1,7 +1,9 @@
 package com.veterinaria.ms_facturacion.service;
 
+import com.veterinaria.ms_facturacion.dto.DuenoDto;
 import com.veterinaria.ms_facturacion.dto.FacturaRequestDto;
 import com.veterinaria.ms_facturacion.dto.FacturaResponseDto;
+import com.veterinaria.ms_facturacion.feign.UsuarioClient;
 import com.veterinaria.ms_facturacion.model.EstadoFactura;
 import com.veterinaria.ms_facturacion.model.Factura;
 import com.veterinaria.ms_facturacion.repository.FacturaRepository;
@@ -19,6 +21,7 @@ import java.util.stream.Collectors;
 public class FacturacionService {
 
     private final FacturaRepository facturaRepository;
+    private final UsuarioClient usuarioClient;
 
     public List<FacturaResponseDto> findAll() {
         log.info("Obteniendo todas las facturas");
@@ -54,6 +57,14 @@ public class FacturacionService {
 
     public FacturaResponseDto save(FacturaRequestDto dto) {
         log.info("Creando factura para consulta id={}", dto.getIdConsulta());
+
+        // Verificar que el dueño existe y está activo via Feign antes de facturar
+        DuenoDto dueno = usuarioClient.getDueno(dto.getIdDueno());
+        if (dueno == null || Boolean.FALSE.equals(dueno.getActivo())) {
+            throw new RuntimeException(
+                    "El dueño no existe o no está activo, no se puede facturar");
+        }
+
         Factura factura = Factura.builder()
                 .idConsulta(dto.getIdConsulta())
                 .idMascota(dto.getIdMascota())
