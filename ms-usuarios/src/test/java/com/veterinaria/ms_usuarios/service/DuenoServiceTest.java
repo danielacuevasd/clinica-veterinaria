@@ -2,6 +2,8 @@ package com.veterinaria.ms_usuarios.service;
 
 import com.veterinaria.ms_usuarios.dto.DuenoRequestDto;
 import com.veterinaria.ms_usuarios.dto.DuenoResponseDto;
+import com.veterinaria.ms_usuarios.dto.MascotaDto;
+import com.veterinaria.ms_usuarios.feign.MascotaClient;
 import com.veterinaria.ms_usuarios.model.Dueno;
 import com.veterinaria.ms_usuarios.repository.DuenoRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,11 +23,14 @@ import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.any;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("DuenoService - Pruebas Unitarias")
+@DisplayName("DuenoService - Pruebas Unitarias (con Feign mockeado)")
 class DuenoServiceTest {
 
     @Mock
     private DuenoRepository duenoRepository;
+
+    @Mock
+    private MascotaClient mascotaClient;
 
     @InjectMocks
     private DuenoService duenoService;
@@ -150,12 +155,14 @@ class DuenoServiceTest {
         verify(duenoRepository, times(1)).findByActivoTrue();
     }
 
-    // delete() - eliminacion logica (no borra fisicamente)
+    // delete() - eliminacion logica (no borra fisicamente), ahora validando via Feign
+    // que el dueno no tenga mascotas activas registradas
     @Test
-    @DisplayName("delete: deberia marcar activo=false en lugar de borrar fisicamente")
+    @DisplayName("delete: deberia marcar activo=false cuando el dueno no tiene mascotas activas")
     void delete_marcaDuenoComoInactivo() {
         // Given
         when(duenoRepository.findById(1L)).thenReturn(Optional.of(duenoEjemplo));
+        when(mascotaClient.getMascotasByDueno(1L)).thenReturn(List.of()); // sin mascotas
         when(duenoRepository.save(any(Dueno.class))).thenReturn(duenoEjemplo);
 
         // When
@@ -163,9 +170,53 @@ class DuenoServiceTest {
 
         // Then: se verifica que el dueno fue marcado inactivo antes de guardar
         assertFalse(duenoEjemplo.getActivo());
+        verify(mascotaClient, times(1)).getMascotasByDueno(1L);
         verify(duenoRepository, times(1)).save(duenoEjemplo);
         // Confirma que NUNCA se llama a un metodo de borrado fisico
         verify(duenoRepository, never()).deleteById(any());
+    }
+
+    @Test
+    @DisplayName("delete: deberia lanzar excepcion si el dueno tiene mascotas activas registradas")
+    void delete_cuandoTieneMascotasActivas_lanzaRuntimeException() {
+        // Given: el dueno existe, pero tiene una mascota activa
+        when(duenoRepository.findById(1L)).thenReturn(Optional.of(duenoEjemplo));
+
+        MascotaDto mascotaActiva = new MascotaDto();
+        mascotaActiva.setId(1L);
+        mascotaActiva.setIdDueno(1L);
+        mascotaActiva.setActivo(true);
+        when(mascotaClient.getMascotasByDueno(1L)).thenReturn(List.of(mascotaActiva));
+
+        // When + Then
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> duenoService.delete(1L));
+
+        assertEquals("No se puede eliminar el dueño: tiene mascotas activas registradas",
+                ex.getMessage());
+        // Nunca debe marcarse inactivo si tiene mascotas activas
+        verify(duenoRepository, never()).save(any(Dueno.class));
+    }
+
+    @Test
+    @DisplayName("delete: deberia permitir eliminar si las mascotas del dueno estan todas inactivas")
+    void delete_cuandoMascotasEstanInactivas_marcaDuenoComoInactivo() {
+        // Given: el dueno tiene mascotas registradas, pero todas inactivas
+        when(duenoRepository.findById(1L)).thenReturn(Optional.of(duenoEjemplo));
+
+        MascotaDto mascotaInactiva = new MascotaDto();
+        mascotaInactiva.setId(1L);
+        mascotaInactiva.setIdDueno(1L);
+        mascotaInactiva.setActivo(false);
+        when(mascotaClient.getMascotasByDueno(1L)).thenReturn(List.of(mascotaInactiva));
+        when(duenoRepository.save(any(Dueno.class))).thenReturn(duenoEjemplo);
+
+        // When
+        duenoService.delete(1L);
+
+        // Then
+        assertFalse(duenoEjemplo.getActivo());
+        verify(duenoRepository, times(1)).save(duenoEjemplo);
     }
 
     @Test
