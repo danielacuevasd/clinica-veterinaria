@@ -2,9 +2,11 @@ package com.veterinaria.ms_citas.service;
 
 import com.veterinaria.ms_citas.dto.CitaRequestDto;
 import com.veterinaria.ms_citas.dto.CitaResponseDto;
+import com.veterinaria.ms_citas.dto.DuenoDto;
 import com.veterinaria.ms_citas.dto.MascotaDto;
 import com.veterinaria.ms_citas.dto.VeterinarioDto;
 import com.veterinaria.ms_citas.feign.MascotaClient;
+import com.veterinaria.ms_citas.feign.UsuarioClient;
 import com.veterinaria.ms_citas.feign.VeterinarioClient;
 import com.veterinaria.ms_citas.model.Cita;
 import com.veterinaria.ms_citas.model.EstadoCita;
@@ -25,6 +27,7 @@ public class CitaService {
     private final CitaRepository citaRepository;
     private final VeterinarioClient veterinarioClient;
     private final MascotaClient mascotaClient;
+    private final UsuarioClient usuarioClient;
 
     public List<CitaResponseDto> findAll() {
         log.info("Obteniendo todas las citas");
@@ -82,6 +85,13 @@ public class CitaService {
         if (!mascota.getIdDueno().equals(dto.getIdDueno())) {
             throw new RuntimeException(
                     "La mascota no pertenece al dueño indicado");
+        }
+
+        // Verificar que el dueño existe y está activo via Feign
+        DuenoDto dueno = usuarioClient.getDueno(dto.getIdDueno());
+        if (dueno == null || Boolean.FALSE.equals(dueno.getActivo())) {
+            throw new RuntimeException(
+                    "El dueño no existe o no está activo");
         }
 
         Cita cita = Cita.builder()
