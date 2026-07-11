@@ -2,6 +2,8 @@ package com.veterinaria.ms_usuarios.service;
 
 import com.veterinaria.ms_usuarios.dto.DuenoRequestDto;
 import com.veterinaria.ms_usuarios.dto.DuenoResponseDto;
+import com.veterinaria.ms_usuarios.dto.MascotaDto;
+import com.veterinaria.ms_usuarios.feign.MascotaClient;
 import com.veterinaria.ms_usuarios.model.Dueno;
 import com.veterinaria.ms_usuarios.repository.DuenoRepository;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +20,7 @@ import java.util.stream.Collectors;
 public class DuenoService {
 
     private final DuenoRepository duenoRepository;
+    private final MascotaClient mascotaClient;
 
     public List<DuenoResponseDto> findAll() {
         log.info("Obteniendo todos los duenos activos");
@@ -90,6 +93,16 @@ public class DuenoService {
         Dueno dueno = duenoRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException(
                         "Dueno no encontrado con id: " + id));
+
+        // Verificar que no tenga mascotas activas registradas via Feign
+        List<MascotaDto> mascotas = mascotaClient.getMascotasByDueno(id);
+        boolean tieneMascotasActivas = mascotas.stream()
+                .anyMatch(m -> Boolean.TRUE.equals(m.getActivo()));
+        if (tieneMascotasActivas) {
+            throw new RuntimeException(
+                    "No se puede eliminar el dueño: tiene mascotas activas registradas");
+        }
+
         dueno.setActivo(false);
         duenoRepository.save(dueno);
     }
