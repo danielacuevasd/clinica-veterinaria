@@ -1,6 +1,7 @@
 package com.veterinaria.ms_tratamientos.exception;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -30,9 +31,22 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Map<String, String>> handleRuntimeException(
             RuntimeException ex) {
-        log.error("Error de negocio: {}", ex.getMessage());
+        String mensaje = ex.getMessage() != null ? ex.getMessage() : "";
+        String mensajeLower = mensaje.toLowerCase();
+        if (mensajeLower.contains("no encontrad")) {
+            log.warn("Recurso no encontrado: {}", mensaje);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", mensaje));
+        }
+        if (mensajeLower.contains("ya existe")
+                || (mensajeLower.contains("ya est") && mensajeLower.contains("uso"))) {
+            log.warn("Recurso duplicado: {}", mensaje);
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("error", mensaje));
+        }
+        log.error("Error de negocio: {}", mensaje);
         return ResponseEntity.badRequest()
-                .body(Map.of("error", ex.getMessage()));
+                .body(Map.of("error", mensaje));
     }
 
     @ExceptionHandler(Exception.class)
