@@ -99,6 +99,38 @@ docker-compose down -v     # detiene y borra los datos (reinicio limpio)
 - Las 10 bases de datos se crean automáticamente la primera vez que arranca `mysql-local`, mediante el script `mysql-init/01-create-databases.sql`.
 - Si necesitas levantar un microservicio individual fuera de Docker (por ejemplo desde IntelliJ para depurar), recuerda detener su contenedor equivalente primero para evitar conflicto de puertos.
 
+### Levantar por tandas (RAM limitada)
+
+Si la máquina no tiene RAM suficiente para levantar los 12 servicios a la vez, se puede levantar por partes. Ejemplo para probar el flujo de citas (ms-citas → ms-usuarios / ms-mascotas / ms-veterinarios):
+
+**1. Base común (dejar arriba siempre):**
+```bash
+docker compose up -d eureka-server mysql api-gateway
+```
+Esperar ~30-40s y confirmar en [http://localhost:9761](http://localhost:9761) que `EUREKA-SERVER` y `API-GATEWAY` estén `UP`.
+
+**2. Levantar los servicios de esta tanda:**
+```bash
+docker compose up -d ms-usuarios ms-mascotas ms-veterinarios ms-citas
+```
+
+**3. Verificar en Eureka que los 4 se registraron correctamente**, luego probar con Postman contra `http://localhost:9080`.
+
+**4. Al terminar, bajar solo estos 4 antes de levantar otra tanda:**
+```bash
+docker compose stop ms-usuarios ms-mascotas ms-veterinarios ms-citas
+```
+
+**5. Para liberar RAM completamente (no solo pausar):**
+```bash
+docker compose rm -f ms-usuarios ms-mascotas ms-veterinarios ms-citas
+```
+
+**6. Al terminar todas las pruebas, bajar todo:**
+```bash
+docker compose down
+```
+
 ### Perfiles de Spring (dev / prod)
 
 Cada microservicio tiene dos perfiles de configuración:
@@ -108,8 +140,17 @@ Cada microservicio tiene dos perfiles de configuración:
 ## Flujos principales
 
 **Comunicación síncrona (Feign):**
-- ms-citas → ms-veterinarios (verificar disponibilidad)
-- ms-citas → ms-mascotas (verificar mascota del dueño)
+
+| Origen | Destino | Propósito |
+|---|---|---|
+| ms-citas | ms-veterinarios | Verificar que el veterinario existe y está disponible |
+| ms-citas | ms-mascotas | Verificar que la mascota existe y pertenece al dueño indicado |
+| ms-citas | ms-usuarios | Verificar que el dueño existe y está activo |
+| ms-consultas | ms-mascotas | Verificar que la mascota existe y está activa |
+| ms-consultas | ms-veterinarios | Verificar que el veterinario existe y está activo |
+| ms-usuarios | ms-mascotas | Verificar que el dueño no tenga mascotas activas antes de eliminarlo |
+| ms-tratamientos | ms-inventario | Verificar stock del medicamento y descontarlo al crear el tratamiento |
+| ms-facturacion | ms-usuarios | Verificar que el dueño existe y está activo antes de facturar |
 
 **Comunicación asíncrona (Kafka):**
 - ms-consultas publica `consulta.registrada`
